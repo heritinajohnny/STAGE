@@ -1,27 +1,37 @@
 {
-  "name": "psfa",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "stage",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "devDependencies": {
-    "@types/node": "^22.20.2",
-    "@types/pg": "^8.23.1",
-    "drizzle-kit": "^0.31.10",
-    "tsx": "^4.23.13",
-    "typescript": "^7.0.2"
+    "predev": "node scripts/ensure-db.mjs",
+    "dev": "next dev",
+    "build": "next build",
+    "prestart": "node scripts/ensure-db.mjs",
+    "start": "next start",
+    "lint": "eslint"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.2",
     "drizzle-orm": "^0.45.2",
+    "lucide-react": "^0.468.0",
     "jspdf": "^4.2.1",
+    "next": "16.3.4",
     "pg": "^8.23.0",
     "postgres": "^3.4.9",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "recharts": "^3.10.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }
