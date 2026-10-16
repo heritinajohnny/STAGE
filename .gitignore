@@ -1,0 +1,5 @@
+*.rar
+node_modules/
+.next/
+*.rar
+*.zip
