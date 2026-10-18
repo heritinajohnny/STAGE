@@ -6,7 +6,7 @@ import { requireAdmin } from "../../../lib/access";
 import { isSlotAvailable, type AvailableDoctor } from "../../../lib/scheduling";
 import { offerWaitlistForFreedSlot } from "../../../lib/waitlist";
 
-// PUT : Mettre à jour le statut du RDV (ex: 'PRISE_EN_CHARGE', 'TERMINE')
+// PUT : Mettre à jour le statut du rendez-vous
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -17,7 +17,7 @@ export async function PUT(
     const { id: idParam } = await params;
     const id = parseInt(idParam);
     const body = await request.json();
-    const allowedStatuses = ["EN_ATTENTE", "CONFIRME", "PRISE_EN_CHARGE", "TERMINE", "ANNULE"];
+    const allowedStatuses = ["EN_ATTENTE", "CONFIRME", "PRISE_EN_CHARGE", "ANNULE"];
     if (
       !Number.isInteger(id) ||
       (body.status && !allowedStatuses.includes(body.status))
@@ -48,8 +48,7 @@ export async function PUT(
       const nextStatuses: Record<string, string[]> = {
         EN_ATTENTE: ["CONFIRME", "PRISE_EN_CHARGE", "ANNULE"],
         CONFIRME: ["PRISE_EN_CHARGE", "ANNULE"],
-        PRISE_EN_CHARGE: ["TERMINE"],
-        TERMINE: [],
+        PRISE_EN_CHARGE: [],
         ANNULE: [],
       };
       if (

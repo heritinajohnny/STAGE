@@ -5,6 +5,7 @@ import {
   text,
   timestamp,
   integer,
+  boolean,
   uniqueIndex,
   time,
 } from "drizzle-orm/pg-core";
@@ -19,9 +20,11 @@ export const users = pgTable(
     birthDate: varchar("birth_date", { length: 10 }).notNull().default(""),
     gender: varchar("gender", { length: 10 }).notNull().default(""),
     phone: varchar("phone", { length: 20 }).notNull().default(""),
+    address: text("address").notNull().default(""),
     email: varchar("email", { length: 255 }).notNull(),
     passwordHash: text("password_hash").notNull(),
     role: varchar("role", { length: 20 }).default("user").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [uniqueIndex("users_email_unique").on(table.email)],
@@ -90,7 +93,7 @@ export const appointments = pgTable("appointments", {
     .references(() => doctors.id, { onDelete: "cascade" }),
   appointmentDate: timestamp("appointment_date").notNull(),
   durationMinutes: integer("duration_minutes").default(30).notNull(),
-  status: varchar("status", { length: 20 }).default("EN_ATTENTE").notNull(), // 'EN_ATTENTE', 'PRISE_EN_CHARGE', 'TERMINE', 'ANNULE'
+  status: varchar("status", { length: 20 }).default("EN_ATTENTE").notNull(),
   reason: text("reason"),
   requestedBy: integer("requested_by").references(() => users.id, {
     onDelete: "set null",
@@ -127,7 +130,7 @@ export const appointmentWaitlist = pgTable("appointment_waitlist", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// 4. Table des Consultations (Pour les rapports PDF)
+// 4. Historique des consultations médicales
 export const consultations = pgTable("consultations", {
   id: serial("id").primaryKey(),
   appointmentId: integer("appointment_id").references(() => appointments.id, {

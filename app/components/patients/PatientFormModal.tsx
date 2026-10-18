@@ -3,11 +3,12 @@ import React, { useState } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Patient } from "./PatientList";
+import { confirmAction } from "../../lib/confirm";
 
 interface PatientFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: Omit<Patient, "id"> | Patient) => void;
+  onSubmit: (data: Omit<Patient, "id"> | Patient) => void | Promise<void>;
   initialData?: Patient | null;
 }
 
@@ -15,7 +16,7 @@ interface PatientFormModalProps {
 const PatientFormContent: React.FC<{
   initialData?: Patient | null;
   onClose: () => void;
-  onSubmit: (data: Omit<Patient, "id"> | Patient) => void;
+  onSubmit: (data: Omit<Patient, "id"> | Patient) => void | Promise<void>;
 }> = ({ initialData, onClose, onSubmit }) => {
   const [formData, setFormData] = useState({
     firstName: initialData?.firstName || "",
@@ -26,18 +27,25 @@ const PatientFormContent: React.FC<{
     address: initialData?.address || "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (initialData) {
-      onSubmit({ ...initialData, ...formData });
+      const confirmed = await confirmAction({
+        title: "Confirmer la modification",
+        text: `Enregistrer les modifications du dossier de ${initialData.firstName} ${initialData.lastName} ?`,
+        confirmButtonText: "Enregistrer",
+        icon: "question",
+      });
+      if (!confirmed) return;
+      await onSubmit({ ...initialData, ...formData });
     } else {
-      onSubmit(formData);
+      await onSubmit(formData);
     }
     onClose();
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">Nom</label>

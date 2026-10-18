@@ -2,17 +2,16 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "../../../../db";
 import { appointments, doctors, notifications } from "../../../../db/schema";
-import { getSessionFromRequest } from "../../../../lib/auth";
+import { requireActiveUser } from "../../../../lib/access";
 import { offerWaitlistForFreedSlot } from "../../../../lib/waitlist";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = getSessionFromRequest(request);
-  if (!session || session.role !== "user") {
-    return NextResponse.json({ error: "Accès réservé aux comptes utilisateurs." }, { status: 403 });
-  }
+  const { session, response } = await requireActiveUser(request);
+  if (response) return response;
+  if (!session) return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
 
   const { id: idParam } = await params;
   const id = Number(idParam);

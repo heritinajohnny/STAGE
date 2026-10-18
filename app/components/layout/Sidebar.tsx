@@ -1,17 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   CalendarDays,
   CalendarRange,
-  FileChartColumnIncreasing,
   HeartPulse,
   LayoutDashboard,
-  LogOut,
   Stethoscope,
   UsersRound,
 } from "lucide-react";
+import { LogoutButton } from "./LogoutButton";
 
 const navItems = [
   { label: "Tableau de bord", href: "/", icon: LayoutDashboard },
@@ -19,18 +18,10 @@ const navItems = [
   { label: "Médecins", href: "/doctors", icon: Stethoscope },
   { label: "Rendez-vous", href: "/appointments", icon: CalendarDays },
   { label: "Emploi du temps", href: "/schedule", icon: CalendarRange },
-  { label: "Rapports", href: "/reports", icon: FileChartColumnIncreasing },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
-    router.refresh();
-  }
 
   return (
     <aside className="app-sidebar">
@@ -59,10 +50,7 @@ export function Sidebar() {
         })}
       </nav>
       <div className="sidebar-bottom">
-        <button type="button" className="sidebar-logout" onClick={logout}>
-          <LogOut size={18} aria-hidden="true" />
-          <span>Déconnexion</span>
-        </button>
+        <LogoutButton location="sidebar" />
       </div>
     </aside>
   );

@@ -2,11 +2,12 @@ import { and, asc, eq, isNull, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "../../../db";
 import { appointmentWaitlist, doctors, notifications, patients, users } from "../../../db/schema";
-import { getSessionFromRequest } from "../../../lib/auth";
+import { requireActiveUser } from "../../../lib/access";
 
 export async function GET(request: Request) {
-  const session = getSessionFromRequest(request);
-  if (!session || session.role !== "user") return NextResponse.json({ error: "Accès réservé aux comptes utilisateurs." }, { status: 403 });
+  const { session, response } = await requireActiveUser(request);
+  if (response) return response;
+  if (!session) return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
   const rows = await db.select({
     id: appointmentWaitlist.id,
     doctorId: appointmentWaitlist.doctorId,
@@ -46,8 +47,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = getSessionFromRequest(request);
-  if (!session || session.role !== "user") return NextResponse.json({ error: "Accès réservé aux comptes utilisateurs." }, { status: 403 });
+  const { session, response } = await requireActiveUser(request);
+  if (response) return response;
+  if (!session) return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
   const body = (await request.json().catch(() => null)) as {
     doctorId?: unknown;
     specialty?: unknown;

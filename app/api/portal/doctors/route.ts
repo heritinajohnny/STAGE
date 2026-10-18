@@ -2,13 +2,11 @@ import { asc } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "../../../db";
 import { doctors } from "../../../db/schema";
-import { getSessionFromRequest } from "../../../lib/auth";
+import { requireActiveUser } from "../../../lib/access";
 
 export async function GET(request: Request) {
-  const session = getSessionFromRequest(request);
-  if (!session || session.role !== "user") {
-    return NextResponse.json({ error: "Accès réservé aux comptes utilisateurs." }, { status: 403 });
-  }
+  const { response } = await requireActiveUser(request);
+  if (response) return response;
 
   const data = await db
     .select({

@@ -2,8 +2,9 @@
 
 import { FormEvent, useEffect, useEffectEvent, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Bell, CalendarDays, HeartPulse, LogOut, ShieldCheck, Sparkles, X } from "lucide-react";
+import { Bell, CalendarDays, HeartPulse, ShieldCheck, Sparkles, X } from "lucide-react";
+import { LogoutButton } from "../components/layout/LogoutButton";
+import { confirmAction } from "../lib/confirm";
 
 interface User {
   name: string;
@@ -14,6 +15,7 @@ interface User {
   birthDate: string;
   gender: string;
   phone: string;
+  address: string;
 }
 interface Appointment { id: number; appointmentDate: string; status: string; reason: string | null; doctorName: string; doctorFirstName: string; }
 interface NotificationItem { id: number; message: string; readAt: string | null; createdAt: string; href: string; }
@@ -57,12 +59,11 @@ const statusLabels: Record<string, string> = {
   EN_ATTENTE: "En attente de validation",
   CONFIRME: "Confirmé",
   PRISE_EN_CHARGE: "Confirmé",
-  TERMINE: "Terminé",
+  TERMINE: "Consulté",
   ANNULE: "Annulé",
 };
 
 export default function PortalPage() {
-  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
@@ -75,7 +76,7 @@ export default function PortalPage() {
   const [cancelingId, setCancelingId] = useState<number | null>(null);
   const [profileError, setProfileError] = useState("");
   const [cancelError, setCancelError] = useState("");
-  const [profileForm, setProfileForm] = useState({ firstName: "", lastName: "", phone: "", birthDate: "", gender: "" });
+  const [profileForm, setProfileForm] = useState({ firstName: "", lastName: "", phone: "", birthDate: "", gender: "", address: "" });
   const [preferredSpecialty, setPreferredSpecialty] = useState("");
   const [preferredFrom, setPreferredFrom] = useState("");
   const [preferredTo, setPreferredTo] = useState("");
@@ -115,6 +116,7 @@ export default function PortalPage() {
           phone: current.phone || data.user?.phone || "",
           birthDate: current.birthDate || data.user?.birthDate || "",
           gender: current.gender || data.user?.gender || "",
+          address: current.address || data.user?.address || "",
         }));
       }
     }
@@ -134,12 +136,6 @@ export default function PortalPage() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
-
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
-    router.refresh();
-  }
 
   function addChatMessage(role: ChatMessage["role"], content: string) {
     setChatMessages((messages) => [...messages, { id: `${Date.now()}-${Math.random()}`, role, content }]);
@@ -359,6 +355,15 @@ export default function PortalPage() {
   }
 
   async function respondToWaitlist(entry: WaitlistEntry, accept: boolean) {
+    const confirmed = await confirmAction({
+      title: accept ? "Accepter ce créneau ?" : "Refuser cette proposition ?",
+      text: accept
+        ? "Ce créneau sera confirmé pour votre rendez-vous."
+        : "La proposition de rendez-vous sera refusée.",
+      confirmButtonText: accept ? "Accepter" : "Refuser",
+      icon: accept ? "question" : "warning",
+    });
+    if (!confirmed) return;
     try {
       const response = await fetch(`/api/portal/waitlist/${entry.id}`, { method: accept ? "PATCH" : "DELETE" });
       const result = await response.json() as { error?: string };
@@ -374,6 +379,12 @@ export default function PortalPage() {
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!await confirmAction({
+      title: "Confirmer la modification",
+      text: "Enregistrer les modifications de votre profil ?",
+      confirmButtonText: "Enregistrer",
+      icon: "question",
+    })) return;
     setSavingProfile(true);
     setProfileError("");
     try {
@@ -396,7 +407,12 @@ export default function PortalPage() {
   }
 
   async function cancelAppointment(appointment: Appointment) {
-    if (!window.confirm("Voulez-vous vraiment annuler ce rendez-vous ?")) return;
+    const confirmed = await confirmAction({
+      title: "Annuler ce rendez-vous ?",
+      text: "Cette action annulera votre demande de rendez-vous.",
+      confirmButtonText: "Annuler le rendez-vous",
+    });
+    if (!confirmed) return;
     setCancelingId(appointment.id);
     setCancelError("");
     try {
@@ -423,7 +439,7 @@ export default function PortalPage() {
     <main className="portal-page">
       <header className="portal-header">
         <a className="auth-brand" href="/portal"><span className="brand-mark"><HeartPulse size={22} /></span><span>PSFA<span className="brand-period">.</span></span></a>
-        <div className="portal-header-actions"><span className="portal-user-name">{user?.name}</span><button type="button" className="portal-logout" onClick={logout}><LogOut size={17} /> Déconnexion</button></div>
+        <div className="portal-header-actions"><span className="portal-user-name">{user?.name}</span><LogoutButton location="portal" /></div>
       </header>
       <section className="portal-content portal-content-wide">
         <span className="eyebrow">ESPACE PERSONNEL</span>
@@ -445,6 +461,7 @@ export default function PortalPage() {
                   <label>Date de naissance<input required type="date" value={profileForm.birthDate} onChange={(event) => setProfileForm({ ...profileForm, birthDate: event.target.value })} /></label>
                 </div>
                 <label className="portal-booking-form label">Sexe<select required value={profileForm.gender} onChange={(event) => setProfileForm({ ...profileForm, gender: event.target.value })}><option value="">Choisir</option><option value="F">Féminin</option><option value="M">Masculin</option><option value="AUTRE">Autre</option></select></label>
+                <label className="portal-booking-form label">Adresse<textarea maxLength={500} rows={2} value={profileForm.address} onChange={(event) => setProfileForm({ ...profileForm, address: event.target.value })} placeholder="Votre adresse (facultatif)" /></label>
                 {profileError && <p className="portal-form-message error" role="alert">{profileError}</p>}
                 <button className="portal-submit" type="submit" disabled={savingProfile}>{savingProfile ? "Enregistrement..." : "Enregistrer mon profil"}</button>
               </form>
@@ -479,8 +496,11 @@ export default function PortalPage() {
                     <div className="portal-assistant-suggestions">
                       <span>Exemples :</span>
                       {Array.from(new Set(doctors.map((doctor) => doctor.specialty))).slice(0, 3).map((specialty) => {
-                        const example = `Je voudrais un rendez-vous en ${specialty} demain matin`;
-                        return <button key={specialty} type="button" onClick={() => setChatInput(example)}>{example}</button>;
+                        const examples = [
+                          `Je voudrais un rendez-vous en ${specialty} aujourd’hui`,
+                          `Je voudrais un rendez-vous en ${specialty} demain matin`,
+                        ];
+                        return examples.map((example) => <button key={`${specialty}-${example}`} type="button" onClick={() => setChatInput(example)}>{example}</button>);
                       })}
                     </div>
                   )}
@@ -523,7 +543,7 @@ export default function PortalPage() {
             <section className="portal-panel" id="mes-rendez-vous">
               <div className="portal-section-title"><CalendarDays size={19} /><div><h2>Mes rendez-vous</h2><p>État des demandes envoyées.</p></div></div>
               {cancelError && <p className="portal-form-message error" role="alert">{cancelError}</p>}
-              {loading ? <p className="portal-muted">Chargement...</p> : appointments.length === 0 ? <p className="portal-muted">Vous n’avez pas encore de demande.</p> : <ul className="portal-appointments">{appointments.map((appointment) => <li key={appointment.id}><div className="portal-appointment-top"><strong>Dr. {appointment.doctorFirstName} {appointment.doctorName}</strong><span className={`portal-status status-${appointment.status.toLowerCase()}`}>{statusLabels[appointment.status] || appointment.status}</span></div><time>{new Date(appointment.appointmentDate).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}</time>{appointment.reason && <p>{appointment.reason}</p>}{["EN_ATTENTE", "CONFIRME"].includes(appointment.status) && new Date(appointment.appointmentDate) > new Date() && <button className="portal-cancel" type="button" disabled={cancelingId === appointment.id} onClick={() => cancelAppointment(appointment)}><X size={14} /> {cancelingId === appointment.id ? "Annulation..." : "Annuler le rendez-vous"}</button>}</li>)}</ul>}
+              {loading ? <p className="portal-muted">Chargement...</p> : appointments.length === 0 ? <p className="portal-muted">Vous n’avez pas encore de demande.</p> : <ul className="portal-appointments">{appointments.map((appointment) => <li key={appointment.id}><div className="portal-appointment-top"><strong>Dr. {appointment.doctorFirstName} {appointment.doctorName}</strong><span className={`portal-status status-${appointment.status.toLowerCase()}`}>{statusLabels[appointment.status] || "Historique"}</span></div><time>{new Date(appointment.appointmentDate).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}</time>{appointment.reason && <p>{appointment.reason}</p>}{["EN_ATTENTE", "CONFIRME"].includes(appointment.status) && new Date(appointment.appointmentDate) > new Date() && <button className="portal-cancel" type="button" disabled={cancelingId === appointment.id} onClick={() => cancelAppointment(appointment)}><X size={14} /> {cancelingId === appointment.id ? "Annulation..." : "Annuler le rendez-vous"}</button>}</li>)}</ul>}
             </section>
             <section className="portal-panel">
               <div className="portal-section-title"><CalendarDays size={19} /><div><h2>Liste d’attente</h2><p>Propositions de créneaux et position de votre demande.</p></div></div>

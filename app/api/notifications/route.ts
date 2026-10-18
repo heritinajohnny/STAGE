@@ -3,10 +3,15 @@ import { NextResponse } from "next/server";
 import { db } from "../../db";
 import { notifications } from "../../db/schema";
 import { getSessionFromRequest } from "../../lib/auth";
+import { requireActiveUser } from "../../lib/access";
 
 export async function GET(request: Request) {
   const session = getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
+  if (session.role === "user") {
+    const { response } = await requireActiveUser(request);
+    if (response) return response;
+  }
 
   const recipient = session.role === "admin"
     ? and(eq(notifications.recipientRole, "admin"), isNull(notifications.recipientUserId))
@@ -41,6 +46,10 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
+  if (session.role === "user") {
+    const { response } = await requireActiveUser(request);
+    if (response) return response;
+  }
 
   const recipient = session.role === "admin"
     ? and(eq(notifications.recipientRole, "admin"), isNull(notifications.recipientUserId))

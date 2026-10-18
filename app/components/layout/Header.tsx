@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Bell, Check, LogOut } from "lucide-react";
+import { Bell, Check } from "lucide-react";
+import { LogoutButton } from "./LogoutButton";
 
 interface HeaderProps {
   title?: string;
@@ -19,7 +19,6 @@ interface NotificationItem {
 }
 
 export function Header({ title = "Espace de Gestion" }: HeaderProps) {
-  const router = useRouter();
   const [name, setName] = useState("Administration");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -69,12 +68,6 @@ export function Header({ title = "Espace de Gestion" }: HeaderProps) {
   }
 
   const unreadCount = notifications.filter((item) => !item.readAt).length;
-
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
-    router.refresh();
-  }
 
   const initials = name
     .split(/\s+/)
@@ -135,9 +128,7 @@ export function Header({ title = "Espace de Gestion" }: HeaderProps) {
             </section>
           )}
         </div>
-        <button type="button" className="header-logout" onClick={logout} title="Déconnexion" aria-label="Déconnexion">
-          <LogOut size={17} />
-        </button>
+        <LogoutButton location="header" />
       </div>
     </header>
   );

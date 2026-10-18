@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Download } from "lucide-react";
 import { Sidebar } from "../components/layout/Sidebar";
 import { Header } from "../components/layout/Header";
@@ -7,6 +7,8 @@ import { Button } from "../components/ui/Button";
 import { PatientList, Patient } from "../components/patients/PatientList";
 import { PatientFormModal } from "../components/patients/PatientFormModal";
 import { AppointmentHistory, ConsultationHistory, PatientDetails } from "../components/patients/PatientDetails";
+import { RegisteredPatientAccounts } from "../components/patients/RegisteredPatientAccounts";
+import { confirmAction, showActionError } from "../lib/confirm";
 
 export default function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -16,10 +18,14 @@ export default function PatientsPage() {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [patientAppointments, setPatientAppointments] = useState<AppointmentHistory[]>([]);
   const [consultations, setConsultations] = useState<ConsultationHistory[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const historyRequestId = useRef(0);
   const [exportFrom, setExportFrom] = useState("");
   const [exportTo, setExportTo] = useState("");
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
+  const [activeTab, setActiveTab] = useState<"records" | "accounts">("records");
 
   // Fonction pour recharger manuellement la liste
   const refreshPatients = async () => {
@@ -75,6 +81,9 @@ export default function PatientsPage() {
         });
         if (response.ok) {
           await refreshPatients();
+        } else {
+          const result = await response.json() as { error?: string };
+          await showActionError("Modification impossible", result.error || "Le dossier patient n’a pas pu être modifié.");
         }
       } else {
         // Création : POST /api/patients
@@ -94,7 +103,13 @@ export default function PatientsPage() {
 
   // Supprimer un patient (DELETE /api/patients/[id])
   const handleDelete = async (id: number) => {
-    if (!confirm("Voulez-vous vraiment supprimer ce patient ?")) return;
+    const patient = patients.find((item) => item.id === id);
+    const confirmed = await confirmAction({
+      title: "Supprimer ce patient ?",
+      text: patient ? `Le dossier de ${patient.firstName} ${patient.lastName} sera supprimé.` : "Le dossier patient sera supprimé.",
+      confirmButtonText: "Supprimer",
+    });
+    if (!confirmed) return;
 
     try {
       const response = await fetch(`/api/patients/${id}`, {
@@ -102,9 +117,13 @@ export default function PatientsPage() {
       });
       if (response.ok) {
         setPatients((prev) => prev.filter((p) => p.id !== id));
+      } else {
+        const result = await response.json() as { error?: string };
+        await showActionError("Suppression impossible", result.error || "Le patient n’a pas pu être supprimé.");
       }
     } catch (error) {
       console.error("Erreur lors de la suppression:", error);
+      await showActionError("Suppression impossible", "Impossible de contacter le serveur.");
     }
   };
 
@@ -119,18 +138,27 @@ export default function PatientsPage() {
   };
 
   const handleOpenDetails = async (patient: Patient) => {
+    const requestId = ++historyRequestId.current;
     setSelectedPatient(patient);
+    setPatientAppointments([]);
+    setConsultations([]);
+    setHistoryError("");
+    setHistoryLoading(true);
     setIsDetailsOpen(true);
     try {
       const response = await fetch(`/api/patients/${patient.id}/history`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Impossible de charger l’historique.");
+      if (requestId !== historyRequestId.current) return;
       setPatientAppointments(data.appointments);
       setConsultations(data.consultations);
     } catch (error) {
       console.error("Erreur lors du chargement de l’historique du patient:", error);
-      setPatientAppointments([]);
-      setConsultations([]);
+      if (requestId === historyRequestId.current) {
+        setHistoryError(error instanceof Error ? error.message : "Impossible de charger l’historique.");
+      }
+    } finally {
+      if (requestId === historyRequestId.current) setHistoryLoading(false);
     }
   };
 
@@ -171,12 +199,18 @@ export default function PatientsPage() {
         <Header title="Gestion des Patients" />
         <main className="page-content space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <h1 className="text-2xl font-bold text-gray-800">Liste des Patients</h1>
-            <Button variant="primary" onClick={handleOpenCreate}>
-              + Nouveau Patient
-            </Button>
+            <h1 className="text-2xl font-bold text-gray-800">Gestion des patients</h1>
+            {activeTab === "records" && <Button variant="primary" onClick={handleOpenCreate}>+ Nouveau Patient</Button>}
           </div>
 
+          <div className="flex gap-2 border-b" role="tablist" aria-label="Gestion des patients">
+            <button type="button" role="tab" aria-selected={activeTab === "records"} className={`border-b-2 px-4 py-3 text-sm font-medium ${activeTab === "records" ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500"}`} onClick={() => setActiveTab("records")}>Dossiers patients</button>
+            <button type="button" role="tab" aria-selected={activeTab === "accounts"} className={`border-b-2 px-4 py-3 text-sm font-medium ${activeTab === "accounts" ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500"}`} onClick={() => setActiveTab("accounts")}>Comptes inscrits</button>
+          </div>
+
+          {activeTab === "accounts" ? (
+            <RegisteredPatientAccounts onViewRecord={(patient) => void handleOpenDetails(patient)} />
+          ) : <>
           <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-end gap-3">
               <div>
@@ -213,12 +247,18 @@ export default function PatientsPage() {
             initialData={selectedPatient}
           />
 
+          </>}
           <PatientDetails
             isOpen={isDetailsOpen}
-            onClose={() => setIsDetailsOpen(false)}
+            onClose={() => {
+              historyRequestId.current += 1;
+              setIsDetailsOpen(false);
+            }}
             patient={selectedPatient}
             appointments={patientAppointments}
             consultations={consultations}
+            historyLoading={historyLoading}
+            historyError={historyError}
           />
         </main>
       </div>

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
+import { confirmAction } from "../../lib/confirm";
 
 const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 
@@ -73,6 +74,12 @@ export function DoctorAvailabilityModal({
   async function saveSchedule(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!doctor) return;
+    if (!await confirmAction({
+      title: "Confirmer la modification",
+      text: "Enregistrer les nouveaux horaires et capacités de consultation ?",
+      confirmButtonText: "Enregistrer",
+      icon: "question",
+    })) return;
     setSaving(true);
     setError("");
     try {
@@ -119,6 +126,12 @@ export function DoctorAvailabilityModal({
 
   async function removePeriod(periodId: number) {
     if (!doctor) return;
+    const confirmed = await confirmAction({
+      title: "Supprimer cette période ?",
+      text: "Cette absence ou ce créneau bloqué sera supprimé.",
+      confirmButtonText: "Supprimer",
+    });
+    if (!confirmed) return;
     const response = await fetch(`/api/doctors/${doctor.id}/availability`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },

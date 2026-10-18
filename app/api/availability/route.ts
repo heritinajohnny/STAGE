@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "../../db";
 import { appointments, doctors, doctorUnavailability, doctorWorkingHours } from "../../db/schema";
 import { getSessionFromRequest } from "../../lib/auth";
+import { requireActiveUser } from "../../lib/access";
 import { getAvailableSlots, type AvailableDoctor } from "../../lib/scheduling";
 
 function parseDateBound(value: string | null, endOfDay: boolean) {
@@ -33,6 +34,10 @@ function parseDateBound(value: string | null, endOfDay: boolean) {
 export async function GET(request: Request) {
   const session = getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
+  if (session.role === "user") {
+    const { response } = await requireActiveUser(request);
+    if (response) return response;
+  }
 
   const url = new URL(request.url);
   const fromValue = url.searchParams.get("from");

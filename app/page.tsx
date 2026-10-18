@@ -19,9 +19,7 @@ export default function DashboardPage() {
     confirmedAppointments: 0,
     pendingAppointments: 0,
     canceledAppointments: 0,
-    totalConsultations: 0,
     waitingPatients: 0,
-    occupancyRate: 0,
   });
   const [statusData, setStatusData] = useState<AppointmentStatusData[]>([]);
   const [activityData, setActivityData] = useState<DailyActivityData[]>([]);
@@ -84,7 +82,6 @@ export default function DashboardPage() {
             </p>
           ) : (
             <>
-              {/* Cartes KPI */}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                 <StatCard
                   title="Total Patients"
@@ -100,12 +97,9 @@ export default function DashboardPage() {
                 <StatCard title="Confirmés" value={stats.confirmedAppointments} subtitle="Rendez-vous validés" />
                 <StatCard title="En attente" value={stats.pendingAppointments} subtitle="Demandes à valider" />
                 <StatCard title="Annulés" value={stats.canceledAppointments} subtitle="Demandes annulées" />
-                <StatCard title="Consultations" value={stats.totalConsultations} subtitle="Dossiers consultés" />
                 <StatCard title="Liste d’attente" value={stats.waitingPatients} subtitle="Patients en attente de créneau" />
-                <StatCard title="Occupation" value={`${stats.occupancyRate}%`} subtitle="Capacité utilisée cette semaine" />
               </div>
 
-              {/* Graphiques */}
               <AppointmentChart
                 statusData={statusData}
                 activityData={activityData}

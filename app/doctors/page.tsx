@@ -6,6 +6,7 @@ import { Button } from "../components/ui/Button";
 import { DoctorList, Doctor } from "../components/doctors/DoctorList";
 import { DoctorFormModal } from "../components/doctors/DoctorFormModal";
 import { DoctorAvailabilityModal } from "../components/doctors/DoctorAvailabilityModal";
+import { confirmAction, showActionError } from "../lib/confirm";
 
 export default function DoctorsPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -67,6 +68,9 @@ export default function DoctorsPage() {
         });
         if (response.ok) {
           await refreshDoctors();
+        } else {
+          const result = await response.json() as { error?: string };
+          await showActionError("Modification impossible", result.error || "Les informations du médecin n’ont pas pu être modifiées.");
         }
       } else {
         const response = await fetch("/api/doctors", {
@@ -85,7 +89,13 @@ export default function DoctorsPage() {
 
   // Suppression (DELETE)
   const handleDelete = async (id: number) => {
-    if (!confirm("Voulez-vous vraiment supprimer ce médecin ?")) return;
+    const doctor = doctors.find((item) => item.id === id);
+    const confirmed = await confirmAction({
+      title: "Supprimer ce médecin ?",
+      text: doctor ? `Le Dr. ${doctor.firstName} ${doctor.lastName} sera supprimé.` : "Le médecin sera supprimé.",
+      confirmButtonText: "Supprimer",
+    });
+    if (!confirmed) return;
 
     try {
       const response = await fetch(`/api/doctors/${id}`, {
@@ -93,9 +103,13 @@ export default function DoctorsPage() {
       });
       if (response.ok) {
         setDoctors((prev) => prev.filter((d) => d.id !== id));
+      } else {
+        const result = await response.json() as { error?: string };
+        await showActionError("Suppression impossible", result.error || "Le médecin n’a pas pu être supprimé.");
       }
     } catch (error) {
       console.error("Erreur lors de la suppression du médecin:", error);
+      await showActionError("Suppression impossible", "Impossible de contacter le serveur.");
     }
   };
 

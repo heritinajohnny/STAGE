@@ -19,6 +19,9 @@ export async function POST(request: Request) {
   if (!user || !(await compare(password, user.passwordHash))) {
     return NextResponse.json({ error: "E-mail ou mot de passe incorrect." }, { status: 401 });
   }
+  if (!user.isActive) {
+    return NextResponse.json({ error: "Ce compte a été désactivé. Contactez l’administration." }, { status: 403 });
+  }
 
   const token = createSessionToken({
     id: user.id,

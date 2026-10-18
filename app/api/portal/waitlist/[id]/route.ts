@@ -2,7 +2,7 @@ import { and, eq, gt, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "../../../../db";
 import { appointmentWaitlist, appointments, doctors, doctorUnavailability, doctorWorkingHours, notifications } from "../../../../db/schema";
-import { getSessionFromRequest } from "../../../../lib/auth";
+import { requireActiveUser } from "../../../../lib/access";
 import { isSlotAvailable, type AvailableDoctor } from "../../../../lib/scheduling";
 import { sql } from "drizzle-orm";
 import { offerWaitlistForFreedSlot } from "../../../../lib/waitlist";
@@ -11,8 +11,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = getSessionFromRequest(request);
-  if (!session || session.role !== "user") return NextResponse.json({ error: "Accès réservé aux comptes utilisateurs." }, { status: 403 });
+  const { session, response } = await requireActiveUser(request);
+  if (response) return response;
+  if (!session) return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
   const id = Number((await params).id);
   if (!Number.isInteger(id) || id < 1) return NextResponse.json({ error: "Inscription invalide." }, { status: 400 });
 
@@ -104,8 +105,9 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = getSessionFromRequest(request);
-  if (!session || session.role !== "user") return NextResponse.json({ error: "Accès réservé aux comptes utilisateurs." }, { status: 403 });
+  const { session, response } = await requireActiveUser(request);
+  if (response) return response;
+  if (!session) return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
   const id = Number((await params).id);
   const [entry] = await db.select({
     id: appointmentWaitlist.id,

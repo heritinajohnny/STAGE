@@ -1,14 +1,13 @@
-import { eq } from "drizzle-orm";
+import { desc, eq, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "../../../db";
-import { consultations, doctors, patients } from "../../../db/schema";
-import { getSessionFromRequest } from "../../../lib/auth";
+import { appointments, consultations, doctors, patients } from "../../../db/schema";
+import { requireActiveUser } from "../../../lib/access";
 
 export async function GET(request: Request) {
-  const session = getSessionFromRequest(request);
-  if (!session || session.role !== "user") {
-    return NextResponse.json({ error: "Accès réservé aux comptes utilisateurs." }, { status: 403 });
-  }
+  const { session, response } = await requireActiveUser(request);
+  if (response) return response;
+  if (!session) return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
   const history = await db.select({
     id: consultations.id,
     consultationDate: consultations.consultationDate,
@@ -21,6 +20,11 @@ export async function GET(request: Request) {
   }).from(consultations)
     .innerJoin(patients, eq(consultations.patientId, patients.id))
     .innerJoin(doctors, eq(consultations.doctorId, doctors.id))
-    .where(eq(patients.userId, session.id));
+    .leftJoin(appointments, eq(consultations.appointmentId, appointments.id))
+    .where(or(
+      eq(patients.userId, session.id),
+      eq(appointments.requestedBy, session.id),
+    ))
+    .orderBy(desc(consultations.consultationDate));
   return NextResponse.json(history);
 }

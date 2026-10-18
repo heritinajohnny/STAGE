@@ -23,7 +23,7 @@ const statusLabels: Record<string, string> = {
   EN_ATTENTE: "À valider",
   CONFIRME: "Confirmé",
   PRISE_EN_CHARGE: "En consultation",
-  TERMINE: "Terminé",
+  TERMINE: "Consulté",
   ANNULE: "Annulé",
 };
 
@@ -103,7 +103,7 @@ export default function SchedulePage() {
                           <strong>{new Date(appointment.appointmentDate).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</strong>
                           <span>{appointment.patientName}</span>
                           {doctorId === "all" && <small>{appointment.doctorName}</small>}
-                          <small className="schedule-event-status">{statusLabels[appointment.status] || appointment.status}</small>
+                          <small className="schedule-event-status">{statusLabels[appointment.status] || "Historique"}</small>
                         </article>
                       ))}
                     </div>
@@ -113,7 +113,7 @@ export default function SchedulePage() {
             </div>
           )}
 
-          <div className="schedule-summary"><Clock3 size={16} /><span>{visibleAppointments.filter((appointment) => appointment.status !== "ANNULE").length} rendez-vous actifs cette semaine</span><span className="schedule-legend"><i className="legend-pending" /> Demande à valider <i className="legend-confirmed" /> Confirmé</span></div>
+          <div className="schedule-summary"><Clock3 size={16} /><span>{visibleAppointments.filter((appointment) => ["EN_ATTENTE", "CONFIRME", "PRISE_EN_CHARGE"].includes(appointment.status)).length} rendez-vous actifs cette semaine</span><span className="schedule-legend"><i className="legend-pending" /> Demande à valider <i className="legend-confirmed" /> Confirmé</span></div>
         </main>
       </div>
     </div>

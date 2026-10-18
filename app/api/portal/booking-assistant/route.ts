@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "../../../db";
 import { doctors } from "../../../db/schema";
-import { getSessionFromRequest } from "../../../lib/auth";
+import { requireActiveUser } from "../../../lib/access";
 
 interface AssistantResult {
   specialty: string | null;
@@ -32,15 +32,35 @@ function specialtyKey(value: string) {
   if (["gynecologue", "gynecologie"].includes(normalized)) return "gynecologie";
   if (["ophtalmologue", "ophtalmologie"].includes(normalized)) return "ophtalmologie";
   if (["dentiste", "odontologie", "dentaire"].includes(normalized)) return "dentaire";
-  if (["medecin generaliste", "medecine generale", "generaliste"].includes(normalized)) return "medecine generale";
+  if (["medecin generaliste", "medecin generale", "medecine generale", "generaliste"].includes(normalized)) return "medecine generale";
   return normalized;
 }
 
+function normalizePrompt(value: string) {
+  return normalizeSpecialty(value)
+    .replace(/[’']/g, " ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function specialtyTerms(value: string) {
+  const key = specialtyKey(value);
+  const terms: Record<string, string[]> = {
+    pediatrie: ["pediatre", "pediatrie"],
+    cardiologie: ["cardiologue", "cardiologie"],
+    dermatologie: ["dermatologue", "dermatologie"],
+    gynecologie: ["gynecologue", "gynecologie"],
+    ophtalmologie: ["ophtalmologue", "ophtalmologie"],
+    dentaire: ["dentiste", "odontologie", "dentaire"],
+    "medecine generale": ["medecin generaliste", "medecin generale", "medecine generale", "generaliste"],
+  };
+  return terms[key] || [normalizeSpecialty(value)];
+}
+
 export async function POST(request: Request) {
-  const session = getSessionFromRequest(request);
-  if (!session || session.role !== "user") {
-    return NextResponse.json({ error: "Accès réservé aux comptes utilisateurs." }, { status: 403 });
-  }
+  const { response } = await requireActiveUser(request);
+  if (response) return response;
 
   const body = await request.json().catch(() => null) as { prompt?: unknown; today?: unknown } | null;
   const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
@@ -48,13 +68,33 @@ export async function POST(request: Request) {
   if (prompt.length < 3 || prompt.length > 240 || !today) {
     return NextResponse.json({ error: "Saisissez une demande courte et une date valide." }, { status: 400 });
   }
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ error: "L’assistant n’est pas configuré. Utilisez les filtres manuels." }, { status: 503 });
-  }
-
   try {
     const specialtyRows = await db.select({ specialty: doctors.specialty }).from(doctors);
     const specialties = [...new Set(specialtyRows.map(({ specialty }) => specialty.trim()).filter(Boolean))].slice(0, 50);
+    const normalizedPrompt = normalizePrompt(prompt);
+    const requestsToday = /\b(aujourd hui|aujourdhui|ce jour|today)\b/.test(normalizedPrompt);
+    if (requestsToday) {
+      const matchedSpecialty = specialties.find((specialty) =>
+        specialtyTerms(specialty).some((term) => normalizedPrompt.includes(term)),
+      );
+      if (matchedSpecialty) {
+        const periodOfDay = /\b(matin|matinee)\b/.test(normalizedPrompt)
+          ? "MORNING"
+          : /\b(apres midi|soir)\b/.test(normalizedPrompt)
+            ? "AFTERNOON"
+            : "ANY";
+        return NextResponse.json({
+          specialty: matchedSpecialty,
+          dateFrom: today,
+          dateTo: today,
+          periodOfDay,
+        });
+      }
+    }
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({ error: "L’assistant n’est pas configuré. Utilisez les filtres manuels." }, { status: 503 });
+    }
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {

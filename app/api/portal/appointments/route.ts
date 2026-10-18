@@ -2,16 +2,15 @@ import { and, asc, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "../../../db";
 import { appointments, doctors, doctorUnavailability, doctorWorkingHours, notifications, patients, users } from "../../../db/schema";
-import { getSessionFromRequest } from "../../../lib/auth";
+import { requireActiveUser } from "../../../lib/access";
 import { isSlotAvailable, type AvailableDoctor } from "../../../lib/scheduling";
 
 const activeStatuses = ["EN_ATTENTE", "CONFIRME", "PRISE_EN_CHARGE"] as const;
 
 export async function GET(request: Request) {
-  const session = getSessionFromRequest(request);
-  if (!session || session.role !== "user") {
-    return NextResponse.json({ error: "Accès réservé aux comptes utilisateurs." }, { status: 403 });
-  }
+  const { session, response } = await requireActiveUser(request);
+  if (response) return response;
+  if (!session) return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
 
   const items = await db
     .select({
@@ -30,10 +29,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = getSessionFromRequest(request);
-  if (!session || session.role !== "user") {
-    return NextResponse.json({ error: "Accès réservé aux comptes utilisateurs." }, { status: 403 });
-  }
+  const { session, response } = await requireActiveUser(request);
+  if (response) return response;
+  if (!session) return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
 
   const body = await request.json().catch(() => null) as {
     appointmentDate?: unknown;
@@ -90,6 +88,7 @@ export async function POST(request: Request) {
         birthDate: users.birthDate,
         gender: users.gender,
         phone: users.phone,
+        address: users.address,
       })
       .from(users)
       .where(eq(users.id, session.id))

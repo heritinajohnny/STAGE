@@ -8,6 +8,8 @@ import {
   AppointmentList,
   Appointment,
 } from "../components/appointments/AppointmentList";
+import { ConsultationFormValues } from "../components/appointments/ConsultationFormModal";
+import { confirmAction } from "../lib/confirm";
 import { AppointmentModal } from "../components/appointments/AppointmentModal";
 
 interface SelectOption {
@@ -144,6 +146,30 @@ function AppointmentsContent() {
     id: number,
     status: Appointment["status"],
   ) => {
+    const appointment = appointments.find((item) => item.id === id);
+    const decision = status === "ANNULE"
+      ? {
+          title: "Annuler ce rendez-vous ?",
+          text: `La demande et le rendez-vous de ${appointment?.patientName || "ce patient"} seront annulés.`,
+          confirmButtonText: "Annuler le rendez-vous",
+          icon: "warning" as const,
+        }
+      : status === "CONFIRME"
+        ? {
+            title: "Confirmer la demande ?",
+            text: `Confirmer le rendez-vous de ${appointment?.patientName || "ce patient"} ?`,
+            confirmButtonText: "Confirmer",
+            icon: "question" as const,
+          }
+        : status === "PRISE_EN_CHARGE"
+          ? {
+              title: "Démarrer la consultation ?",
+              text: `Le rendez-vous de ${appointment?.patientName || "ce patient"} passera en consultation.`,
+              confirmButtonText: "Démarrer",
+              icon: "question" as const,
+            }
+          : null;
+    if (decision && !await confirmAction(decision)) return;
     try {
       setActionError("");
       const response = await fetch(`/api/appointments/${id}`, {
@@ -163,6 +189,26 @@ function AppointmentsContent() {
     } catch (error) {
       console.error("Erreur lors du changement de statut:", error);
       setActionError("Impossible de contacter le serveur pour modifier ce rendez-vous.");
+    }
+  };
+
+  const handleConsultation = async (id: number, values: ConsultationFormValues): Promise<string | null> => {
+    try {
+      const response = await fetch(`/api/appointments/${id}/consultation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) return result.error || "L’enregistrement de la consultation a échoué.";
+      setAppointments((current) => current.map((appointment) =>
+        appointment.id === id ? { ...appointment, status: "TERMINE" } : appointment,
+      ));
+      await refreshAppointments();
+      return null;
+    } catch (error) {
+      console.error("Erreur lors de l’enregistrement de la consultation:", error);
+      return "Impossible de contacter le serveur pour enregistrer la consultation.";
     }
   };
 
@@ -197,7 +243,7 @@ function AppointmentsContent() {
     <div className="app-shell">
       <Sidebar />
       <div className="app-workspace">
-        <Header title="Rendez-vous & Consultations" />
+        <Header title="Gestion des rendez-vous" />
         <main className="page-content space-y-6">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold text-gray-800">
@@ -215,9 +261,7 @@ function AppointmentsContent() {
               appointments={appointments}
               highlightedAppointmentId={highlightedAppointmentId}
               onStatusChange={handleStatusChange}
-              onOpenConsultation={(apt) => {
-                alert(`Ouverture de la consultation pour le RDV #${apt.id}`);
-              }}
+              onConsult={handleConsultation}
             />
           )}
           {actionError && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">{actionError}</p>}
